@@ -259,7 +259,7 @@ function nebulaTexture(hueA,hueB){
 const canvas=document.getElementById("gl");
 const boot=document.getElementById("boot");
 let renderer,scene,camera,composer,shield,frontMat,backMat,midMat,rimLightA,keyGlow,starsA,starsB,starsC,nebA,nebB,sets=[];
-let texTeam=0, lastActive=-2;
+let frontTeam=0, backTeam=1, midTeam=0, lastActive=-2;
 let baseX=-1.25, baseY=-0.12;
 const mouse={x:0,y:0};
 const state={i:0,p:0.5,active:-1,heroT:0};
@@ -290,6 +290,7 @@ async function init(){
   frontMat=new THREE.MeshPhysicalMaterial({map:sets[0].tex, alphaTest:0.3, metalness:0.3, roughness:0.4,
                                            clearcoat:1, clearcoatRoughness:0.16, envMapIntensity:0.95, side:THREE.FrontSide});
   backMat=frontMat.clone();
+  backMat.map=sets[1].tex;   // o verso já nasce com o próximo escudo (flip de carta real)
   midMat=new THREE.MeshBasicMaterial({map:sets[0].dark, alphaTest:0.3, side:THREE.DoubleSide});
   const front=new THREE.Mesh(plane,frontMat); front.position.z=TH/2;
   const back =new THREE.Mesh(plane,backMat);  back.position.z=-TH/2; back.rotation.y=Math.PI;
@@ -359,7 +360,8 @@ async function init(){
   window.__three3d={ok:true, faces:sets.length};
   // gancho de debug: executa um frame manualmente (para verificação offscreen)
   window.__tick=()=>{ readScroll(); shield.rotation.y=targetRot(); swapByRotation(); composer.render();
-    return {i:state.i, p:+state.p.toFixed(3), active:state.active, texTeam,
+    return {i:state.i, p:+state.p.toFixed(3), active:state.active,
+            front:frontTeam, back:backTeam, mid:midTeam,
             rotYdeg:+(shield.rotation.y*180/Math.PI).toFixed(1),
             c1:getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(),
             counter:counter.textContent}; };
@@ -436,15 +438,16 @@ function targetRot(){
   return (state.i + (state.p-0.5))*Math.PI;                 // seção k centrada => k*180°
 }
 
-/* troca das texturas pelo ângulo RENDERIZADO => sempre acontece com o escudo de perfil (invisível) */
+/* flip de carta real: frente e verso carregam times diferentes, e cada face
+   só é atualizada enquanto está ESCONDIDA atrás da outra => troca invisível */
 function swapByRotation(){
-  const k=clamp(Math.round(shield.rotation.y/Math.PI),0,N-1);
-  if(k!==texTeam){
-    frontMat.map=sets[k].tex;  frontMat.needsUpdate=true;
-    backMat.map=sets[k].tex;   backMat.needsUpdate=true;
-    midMat.map=sets[k].dark;   midMat.needsUpdate=true;
-    texTeam=k;
-  }
+  const rot=shield.rotation.y/Math.PI;                 // rotação em meias-voltas
+  const f=clamp(2*Math.round(rot/2),0,N-1);            // frente: índice par mais próximo (muda quando rot é ímpar = frente oculta)
+  const b=clamp(2*Math.round((rot-1)/2)+1,0,N-1);      // verso: índice ímpar mais próximo (muda quando rot é par = verso oculto)
+  const m=clamp(Math.round(rot),0,N-1);                // miolo escuro segue quem está de frente (muda de perfil)
+  if(f!==frontTeam){ frontMat.map=sets[f].tex; frontMat.needsUpdate=true; frontTeam=f; }
+  if(b!==backTeam){  backMat.map=sets[b].tex;  backMat.needsUpdate=true;  backTeam=b; }
+  if(m!==midTeam){   midMat.map=sets[m].dark;  midMat.needsUpdate=true;   midTeam=m; }
 }
 
 /* loop */
