@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Brasileirão Série A · Escudos 3D</title>
+<style>
+  :root{ --c1:#C52613; --c2:#111111; --bg:#04050a; }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:#fff;overflow-x:hidden;}
+
+  /* fundo colorido por time */
+  .bg{position:fixed; inset:0; z-index:0;
+    background:
+      radial-gradient(1200px 820px at 26% 42%, color-mix(in srgb,var(--c1) 30%,transparent) 0%, transparent 60%),
+      radial-gradient(900px 720px at 82% 78%, color-mix(in srgb,var(--c2) 42%,transparent) 0%, transparent 60%),
+      linear-gradient(160deg,#04050a 0%,#090b13 100%);
+    transition:background .8s ease;}
+
+  /* canvas WebGL */
+  #gl{position:fixed; inset:0; z-index:1; pointer-events:none;}
+
+  /* carregando */
+  #boot{position:fixed; inset:0; z-index:20; display:grid; place-items:center; background:#04050a; transition:opacity .6s ease;}
+  #boot .ring{width:54px;height:54px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--c1);animation:sp 1s linear infinite;}
+  #boot p{position:absolute; margin-top:96px; font-size:12px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,.5);}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  #boot.gone{opacity:0; pointer-events:none;}
+
+  /* HUD */
+  .hud{position:fixed; inset:0; z-index:6; pointer-events:none; padding:26px 40px;
+       display:flex; justify-content:space-between; align-items:flex-start;
+       letter-spacing:3px; font-size:12px; text-transform:uppercase; color:rgba(255,255,255,.72);}
+  .hud b{color:#fff;}
+  .counter{font-variant-numeric:tabular-nums; font-size:14px; opacity:0; transition:opacity .4s ease;}
+  .counter.show{opacity:1;}
+  .pbar{position:fixed; left:0; bottom:0; height:4px; width:100%; background:rgba(255,255,255,.08); z-index:6;}
+  .pbar>i{display:block; height:100%; width:0%;
+          background:linear-gradient(90deg,var(--c1),color-mix(in srgb,var(--c1) 40%,#fff)); transition:background .5s ease;}
+
+  /* HERO */
+  .hero{position:relative; z-index:5; height:100vh; display:grid; place-items:center; text-align:center; pointer-events:none;}
+  .hero .kick{font-size:13px; letter-spacing:6px; text-transform:uppercase; color:rgba(255,255,255,.55); margin-bottom:20px;}
+  .hero h1{font-size:clamp(40px,9vw,118px); font-weight:800; letter-spacing:-2px; line-height:.94;
+           background:linear-gradient(180deg,#fff,#98a0b0); -webkit-background-clip:text; background-clip:text; color:transparent;
+           filter:drop-shadow(0 8px 30px rgba(0,0,0,.5));}
+  .hero .sub{margin-top:20px; font-size:15px; letter-spacing:2px; color:rgba(255,255,255,.62);}
+  .hero .mouse{margin:42px auto 0; width:24px; height:38px; border:2px solid rgba(255,255,255,.5); border-radius:13px; position:relative;}
+  .hero .mouse::after{content:""; position:absolute; left:50%; top:7px; width:3px; height:8px; background:#fff; border-radius:2px;
+                      transform:translateX(-50%); animation:wheel 1.6s ease-in-out infinite;}
+  @keyframes wheel{0%{opacity:1;top:7px}60%{opacity:0;top:18px}100%{opacity:0}}
+
+  /* seções de time (só texto; o escudo é WebGL) */
+  .team{position:relative; z-index:5; height:190vh; pointer-events:none;}
+  .team .pin{position:sticky; top:0; height:100vh; display:grid; grid-template-columns:1fr 1fr; align-items:center;
+             max-width:1240px; margin:0 auto; padding:0 52px;}
+  .info{max-width:520px; grid-column:2;}
+  .info .idx{font-size:13px; letter-spacing:4px; color:color-mix(in srgb,var(--c1) 55%,#fff); font-weight:700;}
+  .info h2{font-size:clamp(34px,4.6vw,66px); font-weight:800; letter-spacing:-1px; line-height:1; margin:10px 0 14px;
+           text-shadow:0 6px 30px rgba(0,0,0,.5);}
+  .info .meta{font-size:13px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,.55); margin-bottom:22px;}
+  .info .lbl{font-size:11px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:10px;}
+  .titles{display:flex; flex-wrap:wrap; gap:9px; margin-bottom:24px;}
+  .titles span{font-size:13px; padding:7px 14px; border-radius:999px; font-weight:600; backdrop-filter:blur(6px);
+               background:color-mix(in srgb,var(--c1) 22%, rgba(255,255,255,.05));
+               border:1px solid color-mix(in srgb,var(--c1) 55%, transparent); color:#fff;
+               transition:background .6s ease,border-color .6s ease;}
+  .info p{font-size:16.5px; line-height:1.65; color:rgba(255,255,255,.82); text-shadow:0 2px 18px rgba(0,0,0,.5);}
+  .anim{opacity:0; transform:translateY(34px); will-change:transform,opacity;}
+
+  @media (max-width:880px){
+    .team{height:210vh;}
+    .team .pin{grid-template-columns:1fr; padding:0 26px; align-content:end;}
+    .info{grid-column:1; max-width:100%; text-align:center; margin:0 auto 9vh;}
+    .titles{justify-content:center;}
+    .info h2{font-size:clamp(30px,8vw,48px);}
+    .hud{padding:18px 22px;}
+  }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <canvas id="gl"></canvas>
+
+  <div id="boot"><div class="ring"></div><p>renderizando escudos em 3D…</p></div>
+
+  <div class="hud">
+    <div>Brasileirão&nbsp;<b>Série A</b></div>
+    <div class="counter" id="counter">01 / 20</div>
+  </div>
+  <div class="pbar"><i id="pbar"></i></div>
+
+  <section class="hero">
+    <div>
+      <div class="kick">20 clubes · escudos · títulos · história</div>
+      <h1>BRASILEIRÃO<br>SÉRIE A</h1>
+      <div class="sub">Role para girar os escudos em 3D</div>
+      <div class="mouse"></div>
+    </div>
+  </section>
+
+  <main id="main"></main>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+
+/* ---------------- DADOS ---------------- */
+const teams = [
+  {abbr:"FLA", name:"Flamengo", img:"escudos/FLA.svg", founded:1895, city:"Rio de Janeiro / RJ", stadium:"Maracanã", c1:"#C52613", c2:"#0b0b0b",
+   titles:["Brasileirão 9×","Libertadores 4×","Mundial 1981","Copa do Brasil 5×"],
+   history:"Fundado em 1895 no Rio de Janeiro, é o clube de maior torcida do Brasil. Do time de Zico ao tetra da Libertadores em 2025, transformou o Maracanã num caldeirão rubro-negro."},
+  {abbr:"SEP", name:"Palmeiras", img:"escudos/SEP.png", founded:1914, city:"São Paulo / SP", stadium:"Allianz Parque", c1:"#026e3a", c2:"#013d20",
+   titles:["Brasileirão 12×","Libertadores 3×","Copa do Brasil 4×"],
+   history:"Nascido em 1914 como Palestra Italia, o Verdão do Allianz Parque é sinônimo de hegemonia recente. Soma 12 Brasileiros e a tríade de Libertadores (1999, 2020, 2021)."},
+  {abbr:"BOT", name:"Botafogo", img:"escudos/BOT.svg", founded:1904, city:"Rio de Janeiro / RJ", stadium:"Nilton Santos", c1:"#111111", c2:"#2b2b2b",
+   titles:["Brasileirão 3×","Libertadores 2024 (inédita)","Taça Brasil 1968"],
+   history:"O Glorioso de General Severiano (1904) revelou Garrincha, Nílton Santos e Jairzinho. Após décadas de jejum, explodiu em 2024 com o Brasileirão e a inédita Libertadores."},
+  {abbr:"CRU", name:"Cruzeiro", img:"escudos/CRU.svg", founded:1921, city:"Belo Horizonte / MG", stadium:"Mineirão", c1:"#003b8e", c2:"#001d47",
+   titles:["Copa do Brasil 6× (recorde)","Brasileirão 4×","Libertadores 2×"],
+   history:"A Raposa celeste de Belo Horizonte (1921) é a maior campeã da Copa do Brasil, com seis taças. Teve auge no time dos 'Cem Gols' e nos bis da Libertadores (1976, 1997)."},
+  {abbr:"FLU", name:"Fluminense", img:"escudos/FLU.svg", founded:1902, city:"Rio de Janeiro / RJ", stadium:"Maracanã", c1:"#7a0c26", c2:"#065c38",
+   titles:["Libertadores 2023 (inédita)","Brasileirão 4×","Copa do Brasil 2007"],
+   history:"Pioneiro do futebol carioca (1902), o Tricolor das Laranjeiras cultiva o 'futebol-arte'. Em 2023, com Fernando Diniz, enfim ergueu a Libertadores dos sonhos diante do Boca."},
+  {abbr:"INT", name:"Internacional", img:"escudos/INT.svg", founded:1909, city:"Porto Alegre / RS", stadium:"Beira-Rio", c1:"#c8102e", c2:"#5c0713",
+   titles:["Libertadores 2×","Mundial 2006","Brasileirão 3×"],
+   history:"O Colorado de Porto Alegre (1909) é o 'Clube do Povo' gaúcho. Campeão do mundo em 2006 ao bater o Barcelona de Ronaldinho, é bicampeão da Libertadores (2006, 2010)."},
+  {abbr:"COR", name:"Corinthians", img:"escudos/COR.png", founded:1910, city:"São Paulo / SP", stadium:"Neo Química Arena", c1:"#111111", c2:"#2b2b2b",
+   titles:["Brasileirão 7×","Libertadores 2012","Mundial 2012","Copa do Brasil 3×"],
+   history:"Fundado em 1910 pelo povo paulistano, o Timão tem uma das maiores torcidas do país. Coroou sua história em 2012, invicto, com Libertadores e Mundial sobre o Chelsea."},
+  {abbr:"FOR", name:"Fortaleza", img:"escudos/FOR.png", founded:1918, city:"Fortaleza / CE", stadium:"Castelão", c1:"#0a3d91", c2:"#0a2154",
+   titles:["Série B 2018","Vice Sul-Americana 2023","+40 títulos cearenses"],
+   history:"O Leão do Pici (1918) é potência do Nordeste. Voltou à elite em 2018 e viveu noites internacionais como vice da Sul-Americana de 2023, com um Castelão sempre lotado."},
+  {abbr:"BAH", name:"Bahia", img:"escudos/BAH.svg", founded:1931, city:"Salvador / BA", stadium:"Arena Fonte Nova", c1:"#0071bc", c2:"#e30613",
+   titles:["Brasileirão 2× (1959, 1988)","Copa do Nordeste 3×","1º campeão nacional"],
+   history:"O Esquadrão de Aço de Salvador (1931) foi o primeiro campeão brasileiro, na Taça Brasil de 1959. Bicampeão nacional, enche a Fonte Nova de azul, vermelho e branco."},
+  {abbr:"VAS", name:"Vasco da Gama", img:"escudos/VAS.svg", founded:1898, city:"Rio de Janeiro / RJ", stadium:"São Januário", c1:"#101010", c2:"#2b2b2b",
+   titles:["Brasileirão 4×","Libertadores 1998","Copa do Brasil 2011"],
+   history:"O Gigante da Colina (1898) é símbolo da luta contra o preconceito no futebol. Campeão da Libertadores no ano do centenário (1998) e tetra brasileiro, tem São Januário como fortaleza."},
+  {abbr:"SPF", name:"São Paulo", img:"escudos/SPF.svg", founded:1930, city:"São Paulo / SP", stadium:"Morumbis", c1:"#e30613", c2:"#0a0a0a",
+   titles:["Mundial 3× (recorde nacional)","Libertadores 3×","Brasileirão 6×","Copa do Brasil 2023"],
+   history:"O Tricolor do Morumbi (1930) é o clube mais internacional do Brasil. Único tricampeão mundial do país (1992, 1993, 2005), coleciona três Libertadores e seis Brasileiros."},
+  {abbr:"CAM", name:"Atlético-MG", img:"escudos/CAM.svg", founded:1908, city:"Belo Horizonte / MG", stadium:"Arena MRV", c1:"#111111", c2:"#2b2b2b",
+   titles:["Libertadores 2013","Brasileirão 2× (1971, 2021)","Copa do Brasil 2×"],
+   history:"O Galo de Belo Horizonte (1908) tem uma das torcidas mais fervorosas do país. Campeão da Libertadores em 2013, com Ronaldinho, e do primeiro Brasileirão da história, em 1971."},
+  {abbr:"GRE", name:"Grêmio", img:"escudos/GRE.svg", founded:1903, city:"Porto Alegre / RS", stadium:"Arena do Grêmio", c1:"#0d80bf", c2:"#0a2a44",
+   titles:["Libertadores 3×","Mundial 1983","Copa do Brasil 5×","Brasileirão 2×"],
+   history:"O Imortal Tricolor (1903) é orgulho gaúcho. Campeão mundial em 1983 sobre o Hamburgo, tem três Libertadores e é um dos maiores vencedores da Copa do Brasil."},
+  {abbr:"RBB", name:"RB Bragantino", img:"escudos/RBB.png", founded:1928, city:"Bragança Paulista / SP", stadium:"Nabi Abi Chedid", c1:"#e2001a", c2:"#111111",
+   titles:["Série B 2019","Vice Sul-Americana 2021","Paulista 1990"],
+   history:"O Massa Bruta de Bragança Paulista (1928) ganhou nova era com a Red Bull. Campeão paulista histórico de 1990, voltou à Série A e foi vice da Sul-Americana em 2021."},
+  {abbr:"JUV", name:"Juventude", img:"escudos/JUV.png", founded:1913, city:"Caxias do Sul / RS", stadium:"Alfredo Jaconi", c1:"#0a7a3b", c2:"#044021",
+   titles:["Copa do Brasil 1999","Tradição da serra gaúcha"],
+   history:"O Ju de Caxias do Sul (1913) é tradição da serra gaúcha. Escreveu seu maior feito ao vencer a Copa do Brasil de 1999, façanha rara para um clube do interior."},
+  {abbr:"VIT", name:"Vitória", img:"escudos/VIT.svg", founded:1899, city:"Salvador / BA", stadium:"Barradão", c1:"#e2001a", c2:"#101010",
+   titles:["Série B 2013","Copa do Nordeste 2010","Celeiro de craques"],
+   history:"O Leão da Barra (1899) é um dos mais antigos da Bahia e celeiro de craques como Bebeto e Dida. Dono do Barradão, tem a Copa do Nordeste e o título da Série B de 2013."},
+  {abbr:"CEA", name:"Ceará", img:"escudos/CEA.svg", founded:1914, city:"Fortaleza / CE", stadium:"Castelão", c1:"#101010", c2:"#0a3d91",
+   titles:["Copa do Nordeste 2× (2015, 2020)","+40 títulos cearenses"],
+   history:"O Vozão de Fortaleza (1914) é gigante do Nordeste e um dos maiores campeões cearenses. Bicampeão da Copa do Nordeste (2015, 2020), leva multidões ao Castelão."},
+  {abbr:"MIR", name:"Mirassol", img:"escudos/MIR.png", founded:1925, city:"Mirassol / SP", stadium:"Campos Maia", c1:"#f2c200", c2:"#0a7a3b",
+   titles:["Acesso histórico 2024","Estreia na Série A: 2025"],
+   history:"O Leão de Mirassol (1925), do interior paulista, viveu uma ascensão meteórica. Após o acesso de 2024, faz em 2025 sua estreia inédita na elite do futebol brasileiro."},
+  {abbr:"SAN", name:"Santos", img:"escudos/SAN.png", founded:1912, city:"Santos / SP", stadium:"Vila Belmiro", c1:"#f4f4f4", c2:"#b9b9b9",
+   titles:["Mundial 2×","Libertadores 3×","Brasileirão 8×","Casa do Rei Pelé"],
+   history:"A Vila Belmiro (1912) foi o palco do Rei Pelé e do futebol mais encantador do planeta. Bicampeão mundial e da Libertadores (1962, 1963), revelou também Robinho e Neymar."},
+  {abbr:"SPT", name:"Sport", img:"escudos/SPT.svg", founded:1905, city:"Recife / PE", stadium:"Ilha do Retiro", c1:"#e2001a", c2:"#101010",
+   titles:["Brasileirão 1987","Copa do Brasil 2008","Rei do Nordeste"],
+   history:"O Leão da Ilha do Retiro (1905) é o 'Rei do Nordeste'. Campeão brasileiro de 1987 e da Copa do Brasil de 2008, tem uma das torcidas mais apaixonadas da região."},
+];
+const N = teams.length;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const easeIO=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+
+/* ---------------- DOM: seções de texto ---------------- */
+const main=document.getElementById("main");
+const counter=document.getElementById("counter");
+const pbar=document.getElementById("pbar");
+const rootStyle=document.documentElement.style;
+const sections=teams.map((t,i)=>{
+  const sec=document.createElement("section"); sec.className="team";
+  sec.innerHTML=`<div class="pin"><div class="info">
+      <div class="idx anim" data-a>${String(i+1).padStart(2,"0")} / ${String(N).padStart(2,"0")}</div>
+      <h2 class="anim" data-a>${t.name}</h2>
+      <div class="meta anim" data-a>${t.founded} · ${t.city} · ${t.stadium}</div>
+      <div class="lbl anim" data-a>Principais conquistas</div>
+      <div class="titles anim" data-a>${t.titles.map(x=>`<span>${x}</span>`).join("")}</div>
+      <p class="anim" data-a>${t.history}</p>
+    </div></div>`;
+  main.appendChild(sec);
+  return {el:sec, anims:[...sec.querySelectorAll("[data-a]")], hidden:true};
+});
+
+/* ---------------- TEXTURAS: escudo recortado + versão escura (miolo) ---------------- */
+function loadImg(src){return new Promise(res=>{const im=new Image(); im.crossOrigin="anonymous"; im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src;});}
+
+function makeCrestTextures(team,img){
+  const s=1024, c=document.createElement("canvas"); c.width=c.height=s; const x=c.getContext("2d");
+  if(img){
+    const ar=(img.naturalWidth||1)/(img.naturalHeight||1);
+    let w=s*0.86, h=s*0.86; if(ar>=1){h=w/ar;}else{w=h*ar;}
+    x.drawImage(img,(s-w)/2,(s-h)/2,w,h);
+  }else{
+    x.fillStyle="#fff"; x.font=`800 ${s*0.28}px Segoe UI, sans-serif`; x.textAlign="center"; x.textBaseline="middle";
+    x.fillText(team.abbr,s/2,s/2);
+  }
+  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8;
+  // versão escurecida (usada nas fatias internas = "espessura" do escudo)
+  const d=document.createElement("canvas"); d.width=d.height=s; const dx=d.getContext("2d");
+  dx.drawImage(c,0,0);
+  dx.globalCompositeOperation="source-atop"; dx.fillStyle="rgba(10,12,16,0.85)"; dx.fillRect(0,0,s,s);
+  const dark=new THREE.CanvasTexture(d); dark.colorSpace=THREE.SRGBColorSpace;
+  return {tex,dark};
+}
+
+function starSprite(){
+  const s=64,c=document.createElement("canvas");c.width=c.height=s;const x=c.getContext("2d");
+  const g=x.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  g.addColorStop(0,"rgba(255,255,255,1)");
+  g.addColorStop(0.35,"rgba(255,255,255,0.45)");
+  g.addColorStop(1,"rgba(255,255,255,0)");
+  x.fillStyle=g; x.fillRect(0,0,s,s);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+function nebulaTexture(hueA,hueB){
+  const s=512, c=document.createElement("canvas"); c.width=c.height=s; const x=c.getContext("2d");
+  // muitas manchas radiais suaves e fracas = nuvem gasosa
+  for(let i=0;i<70;i++){
+    const px=Math.random()*s, py=Math.random()*s, r=s*(0.06+Math.random()*0.22);
+    const hue=hueA+(hueB-hueA)*Math.random();
+    const g=x.createRadialGradient(px,py,0,px,py,r);
+    g.addColorStop(0,`hsla(${hue},65%,58%,${0.04+Math.random()*0.05})`);
+    g.addColorStop(1,`hsla(${hue},65%,58%,0)`);
+    x.fillStyle=g; x.fillRect(0,0,s,s);
+  }
+  // esvanece as bordas do plano pra não aparecer o retângulo
+  const mask=x.createRadialGradient(s/2,s/2,s*0.12,s/2,s/2,s*0.5);
+  mask.addColorStop(0,"rgba(0,0,0,0)"); mask.addColorStop(1,"rgba(0,0,0,1)");
+  x.globalCompositeOperation="destination-out"; x.fillStyle=mask; x.fillRect(0,0,s,s);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+/* ---------------- CENA WEBGL ---------------- */
+const canvas=document.getElementById("gl");
+const boot=document.getElementById("boot");
+let renderer,scene,camera,composer,shield,frontMat,backMat,midMat,rimLightA,keyGlow,starsA,starsB,starsC,nebA,nebB,sets=[];
+let texTeam=0, lastActive=-2;
+let baseX=-1.25, baseY=-0.12;
+const mouse={x:0,y:0};
+const state={i:0,p:0.5,active:-1,heroT:0};
+let secTops=[], heroSpan=1;
+
+async function init(){
+  const imgs=await Promise.all(teams.map(t=>loadImg(t.img)));
+  sets=teams.map((t,i)=>makeCrestTextures(t,imgs[i]));
+
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:"high-performance"});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.05;
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 100);
+  camera.position.set(0,0,4.6);
+
+  const pmrem=new THREE.PMREMGenerator(renderer);
+  scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+
+  /* ---- escudo 3D: silhueta com espessura (fatias empilhadas) ---- */
+  shield=new THREE.Group();
+  const W=2.75, TH=0.2, LAYERS=24;
+  const plane=new THREE.PlaneGeometry(W,W);
+  frontMat=new THREE.MeshPhysicalMaterial({map:sets[0].tex, alphaTest:0.3, metalness:0.3, roughness:0.4,
+                                           clearcoat:1, clearcoatRoughness:0.16, envMapIntensity:0.95, side:THREE.FrontSide});
+  backMat=frontMat.clone();
+  midMat=new THREE.MeshBasicMaterial({map:sets[0].dark, alphaTest:0.3, side:THREE.DoubleSide});
+  const front=new THREE.Mesh(plane,frontMat); front.position.z=TH/2;
+  const back =new THREE.Mesh(plane,backMat);  back.position.z=-TH/2; back.rotation.y=Math.PI;
+  shield.add(front,back);
+  for(let l=1;l<LAYERS;l++){
+    const m=new THREE.Mesh(plane,midMat);
+    m.position.z=-TH/2 + TH*l/LAYERS;
+    shield.add(m);
+  }
+  shield.position.set(baseX,baseY,0);
+  scene.add(shield);
+
+  /* ---- luzes (contidas: nada de estourar branco) ---- */
+  scene.add(new THREE.AmbientLight(0xffffff,0.4));
+  const key=new THREE.DirectionalLight(0xffffff,1.6); key.position.set(3,4,5); scene.add(key);
+  rimLightA=new THREE.PointLight(0xC52613,70,20,2); rimLightA.position.set(-3,1.5,2.5); scene.add(rimLightA);
+  const fill=new THREE.PointLight(0xffffff,30,20,2); fill.position.set(3,-2,1.5); scene.add(fill);
+  keyGlow=new THREE.PointLight(0xC52613,12,30,2); keyGlow.position.set(baseX,baseY,-2.6); scene.add(keyGlow);
+
+  /* ---- piso espelhado (mais leve) ---- */
+  const floor=new Reflector(new THREE.CircleGeometry(9,64),{textureWidth:512,textureHeight:512,color:0x0a0c12});
+  floor.rotation.x=-Math.PI/2; floor.position.y=-1.62; scene.add(floor);
+
+  /* ---- céu: estrelas com cor de temperatura real + nebulosas ---- */
+  const sprite=starSprite();
+  // paleta de temperatura estelar: azuladas, brancas, amareladas, alaranjadas
+  const palette=[[0.72,0.82,1],[0.85,0.9,1],[1,1,1],[1,1,1],[1,0.92,0.78],[1,0.78,0.62]];
+  const mkStars=(cnt,size,opacity,spread)=>{
+    const pos=new Float32Array(cnt*3), col=new Float32Array(cnt*3);
+    for(let i=0;i<cnt;i++){
+      pos[i*3]=(Math.random()-0.5)*spread; pos[i*3+1]=(Math.random()-0.35)*12; pos[i*3+2]=(Math.random()-0.5)*12-3;
+      const c=palette[(Math.random()*palette.length)|0];
+      col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2];
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute("position",new THREE.BufferAttribute(pos,3));
+    g.setAttribute("color",new THREE.BufferAttribute(col,3));
+    const m=new THREE.PointsMaterial({map:sprite,size,transparent:true,opacity,depthWrite:false,vertexColors:true,
+                                      blending:THREE.AdditiveBlending,sizeAttenuation:true});
+    const p=new THREE.Points(g,m); scene.add(p); return p;
+  };
+  starsA=mkStars(750,0.032,0.85,20);  // poeira estelar fina
+  starsB=mkStars(220,0.06,0.5,18);    // estrelas médias
+  starsC=mkStars(45,0.11,0.38,16);    // estrelas de destaque (cintilam)
+
+  // nebulosas procedurais bem sutis (via-láctea ao fundo)
+  const mkNebula=(hueA,hueB,w,h,px,py,pz,rot,op)=>{
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),
+      new THREE.MeshBasicMaterial({map:nebulaTexture(hueA,hueB),transparent:true,opacity:op,depthWrite:false,
+                                   blending:THREE.AdditiveBlending}));
+    m.position.set(px,py,pz); m.rotation.z=rot; scene.add(m); return m;
+  };
+  nebA=mkNebula(210,265,26,14, 4, 2,-9,-0.4,0.5);   // azul-índigo
+  nebB=mkNebula(275,330,20,12,-6,-3,-10,0.5,0.32);  // violeta-rosado
+
+  /* ---- pós-processamento (bloom) ---- */
+  composer=new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene,camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.32,0.4,0.9));
+  composer.addPass(new OutputPass());
+
+  measure(); layout();
+  addEventListener("resize",onResize,{passive:true});
+  addEventListener("pointermove",e=>{mouse.x=(e.clientX/innerWidth)*2-1; mouse.y=(e.clientY/innerHeight)*2-1;},{passive:true});
+
+  boot.classList.add("gone");
+  window.__three3d={ok:true, faces:sets.length};
+  // gancho de debug: executa um frame manualmente (para verificação offscreen)
+  window.__tick=()=>{ readScroll(); shield.rotation.y=targetRot(); swapByRotation(); composer.render();
+    return {i:state.i, p:+state.p.toFixed(3), active:state.active, texTeam,
+            rotYdeg:+(shield.rotation.y*180/Math.PI).toFixed(1),
+            c1:getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(),
+            counter:counter.textContent}; };
+  renderer.setAnimationLoop(animate);
+}
+
+/* geometria das seções medida UMA vez (e no resize) — nada de getBoundingClientRect por frame */
+function measure(){
+  secTops=sections.map(s=>({top:s.el.offsetTop, h:s.el.offsetHeight}));
+  heroSpan=Math.max(1, secTops[0].top - innerHeight/2);
+}
+function layout(){
+  const mobile=innerWidth<880;
+  baseX = mobile?0:-1.25;
+  baseY = mobile?1.05:-0.12;
+  if(shield) shield.position.x=baseX;
+  if(keyGlow) keyGlow.position.set(baseX,baseY,-2.6);
+}
+function onResize(){
+  renderer.setSize(innerWidth,innerHeight);
+  composer.setSize(innerWidth,innerHeight);
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  measure(); layout();
+}
+
+/* estado a partir do scroll — matemática pura, sem leituras de layout */
+function readScroll(){
+  const vh=innerHeight, y=scrollY;
+  const docMax=document.body.scrollHeight-vh;
+  pbar.style.width=(clamp(y/docMax,0,1)*100).toFixed(2)+"%";
+
+  // seção ativa = a que contém o centro da viewport; p vai de 0 (entra) a 1 (sai), 0.5 = centralizado
+  const mid=y+vh/2;
+  let active=-1,p=0.5;
+  if(mid>=secTops[0].top){
+    active=N-1; p=1;
+    for(let k=0;k<N;k++){
+      if(mid<secTops[k].top+secTops[k].h){ active=k; p=clamp((mid-secTops[k].top)/secTops[k].h,0,1); break; }
+    }
+  }
+  state.active=active; state.i=active<0?0:active; state.p=active<0?0.5:p;
+  state.heroT=clamp(y/heroSpan,0,1);
+
+  // reveal dos textos: só as seções vizinhas do ativo
+  const range=active<0?[0]:[active-1,active,active+1];
+  const vis=new Set();
+  for(const k of range){
+    if(k<0||k>=N) continue;
+    vis.add(k);
+    const s=sections[k];
+    const pp=clamp((mid-secTops[k].top)/secTops[k].h,0,1);
+    const v=easeIO(clamp(Math.min(pp/0.22,(1-pp)/0.16),0,1));
+    s.anims.forEach(a=>{a.style.opacity=v.toFixed(3); a.style.transform=`translateY(${((1-v)*32).toFixed(1)}px)`;});
+    s.hidden=false;
+  }
+  for(let k=0;k<N;k++){
+    if(!vis.has(k) && !sections[k].hidden){ sections[k].anims.forEach(a=>a.style.opacity="0"); sections[k].hidden=true; }
+  }
+
+  // cor/HUD seguem a seção ativa (troca exatamente com o escudo de perfil)
+  if(active!==lastActive){
+    const t=teams[state.i];
+    rootStyle.setProperty("--c1",t.c1); rootStyle.setProperty("--c2",t.c2);
+    if(active<0) counter.classList.remove("show");
+    else{ counter.textContent=String(active+1).padStart(2,"0")+" / "+String(N).padStart(2,"0"); counter.classList.add("show"); }
+    targetColor.set(t.c1);
+    lastActive=active;
+  }
+}
+
+/* rotação alvo: contínua do hero ao último time; escudo encara você no centro de cada seção */
+function targetRot(){
+  if(state.active<0) return -0.5*Math.PI*state.heroT;      // hero: começa de frente, vira até o perfil
+  return (state.i + (state.p-0.5))*Math.PI;                 // seção k centrada => k*180°
+}
+
+/* troca das texturas pelo ângulo RENDERIZADO => sempre acontece com o escudo de perfil (invisível) */
+function swapByRotation(){
+  const k=clamp(Math.round(shield.rotation.y/Math.PI),0,N-1);
+  if(k!==texTeam){
+    frontMat.map=sets[k].tex;  frontMat.needsUpdate=true;
+    backMat.map=sets[k].tex;   backMat.needsUpdate=true;
+    midMat.map=sets[k].dark;   midMat.needsUpdate=true;
+    texTeam=k;
+  }
+}
+
+/* loop */
+const clock=new THREE.Clock();
+const activeColor=new THREE.Color("#C52613"), targetColor=new THREE.Color("#C52613");
+function animate(){
+  const dt=Math.min(clock.getDelta(),0.05), t=clock.elapsedTime;
+  readScroll();
+
+  shield.rotation.y += (targetRot() - shield.rotation.y)*Math.min(1,dt*7);
+  swapByRotation();
+
+  // vida: leve balanço + parallax do mouse
+  shield.rotation.x += ((0.05 + mouse.y*0.1) - shield.rotation.x)*Math.min(1,dt*4);
+  shield.rotation.z = Math.sin(t*0.6)*0.02;
+  shield.position.y = baseY + Math.sin(t*1.1)*0.05;
+
+  activeColor.lerp(targetColor, Math.min(1,dt*3));
+  rimLightA.color.copy(activeColor);
+  keyGlow.color.copy(activeColor);
+
+  starsA.rotation.y += dt*0.015;
+  starsB.rotation.y -= dt*0.008;
+  starsC.material.opacity = 0.38 + Math.sin(t*1.7)*0.14 + Math.sin(t*4.3)*0.05; // cintilação
+  nebA.rotation.z += dt*0.004;
+  nebB.rotation.z -= dt*0.003;
+
+  composer.render();
+}
+
+init().catch(err=>{
+  console.error("Falha ao iniciar 3D:",err);
+  window.__three3d={ok:false, err:String(err&&err.message||err)};
+  boot.innerHTML='<p style="position:static">Não foi possível iniciar o WebGL/3D neste navegador.<br>'+String(err&&err.message||err)+'</p>';
+});
+</script>
+</body>
+</html>
