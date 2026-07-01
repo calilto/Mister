@@ -68,6 +68,33 @@
   .info p{font-size:16.5px; line-height:1.65; color:rgba(255,255,255,.82); text-shadow:0 2px 18px rgba(0,0,0,.5);}
   .anim{opacity:0; transform:translateY(34px); will-change:transform,opacity;}
 
+  /* QUIZ: Escalação do Investidor */
+  .quiz{position:relative; z-index:5; min-height:100vh; display:grid; place-items:center; padding:12vh 24px 10vh;}
+  .qcard{width:min(600px,94vw); background:rgba(10,12,20,.55); border:1px solid rgba(255,255,255,.12); border-radius:24px;
+         padding:34px 34px 30px; backdrop-filter:blur(14px); box-shadow:0 30px 80px rgba(0,0,0,.5);}
+  .qkick{font-size:11px; letter-spacing:4px; text-transform:uppercase; color:color-mix(in srgb,var(--c1) 60%,#fff); margin-bottom:12px; font-weight:700;}
+  .qtitle{font-size:clamp(24px,3.4vw,36px); font-weight:800; letter-spacing:-.5px; line-height:1.15; margin-bottom:10px;}
+  .qsub{font-size:15px; line-height:1.6; color:rgba(255,255,255,.7); margin-bottom:8px;}
+  .qbtn{display:block; width:100%; text-align:left; margin-top:10px; padding:14px 18px; border-radius:14px; cursor:pointer;
+        font:600 15px/1.45 "Segoe UI",sans-serif; color:#fff;
+        background:color-mix(in srgb,var(--c1) 14%, rgba(255,255,255,.04));
+        border:1px solid color-mix(in srgb,var(--c1) 45%, transparent);
+        transition:transform .15s ease, background .2s ease;}
+  .qbtn:hover{transform:translateY(-2px); background:color-mix(in srgb,var(--c1) 30%, rgba(255,255,255,.06));}
+  .qbtn b{display:block; font-size:12px; letter-spacing:2px; text-transform:uppercase; opacity:.65; margin-bottom:3px;}
+  .qprog{font-size:12px; letter-spacing:3px; color:rgba(255,255,255,.5); margin-bottom:8px; font-variant-numeric:tabular-nums;}
+  .qresult{text-align:center;}
+  .qresult .formation{font-size:52px; font-weight:800; letter-spacing:2px; line-height:1; color:color-mix(in srgb,var(--c1) 60%,#fff);}
+  .alloc{margin:20px 0 4px; text-align:left;}
+  .alloc .row{display:flex; align-items:center; gap:10px; margin:8px 0; font-size:13px;}
+  .alloc .row span:first-child{width:150px; color:rgba(255,255,255,.75);}
+  .alloc .bar{flex:1; height:9px; border-radius:6px; background:rgba(255,255,255,.08); overflow:hidden;}
+  .alloc .bar i{display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,var(--c1),color-mix(in srgb,var(--c1) 45%,#fff));}
+  .alloc .pct{width:44px; text-align:right; font-variant-numeric:tabular-nums; color:rgba(255,255,255,.85);}
+  .qactions{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:20px;}
+  .qactions .qbtn{width:auto; display:inline-block; text-align:center; margin-top:0;}
+  .qspacer{height:46vh; pointer-events:none;} /* abre espaço pro brasão 3D girar acima do card */
+
   @media (max-width:880px){
     .team{height:210vh;}
     .team .pin{grid-template-columns:1fr; padding:0 26px; align-content:end;}
@@ -100,6 +127,8 @@
   </section>
 
   <main id="main"></main>
+
+  <section class="quiz" id="quiz"><div id="qwrap"></div></section>
 
 <script type="importmap">
 {
@@ -205,6 +234,160 @@ const sections=teams.map((t,i)=>{
   return {el:sec, anims:[...sec.querySelectorAll("[data-a]")], hidden:true};
 });
 
+/* ---------------- QUIZ: Escalação do Investidor ---------------- */
+const WHATSAPP=""; // <-- seu número com DDI para o botão de contato, ex: "5511999999999" (vazio = botão oculto)
+const quizEl=document.getElementById("quiz");
+const qwrap=document.getElementById("qwrap");
+const quiz={step:-1, score:0, result:null};
+
+const QUESTIONS=[
+ {q:"Como seu time entra em campo?", opts:[
+   ["5-4-1 · Retranca segura","Primeiro não tomar gol. Depois a gente vê."],
+   ["4-4-2 · Clássico equilibrado","Defende bem, ataca quando o jogo permite."],
+   ["3-4-3 · Pressão total","Jogo bom é jogo com gol."]]},
+ {q:"Aos 5 minutos, seu time toma um gol (o mercado caiu 10% no mês)…", opts:[
+   ["Fecho a casinha","Recuo todo mundo e seguro o resultado — reduzo o risco."],
+   ["Mantenho o plano de jogo","Volatilidade faz parte. Sigo a estratégia combinada."],
+   ["Pra cima deles","Preço bom é oportunidade: aproveito a baixa e reforço a posição."]]},
+ {q:"Janela de transferências aberta: como você reforça o elenco?", opts:[
+   ["Prata da casa","Só contrato quem já provou: Tesouro, CDB, o feijão com arroz."],
+   ["Mescla experiente","Titulares sólidos e uma ou duas apostas de impacto."],
+   ["Estrela internacional","Contratação cara e arriscada, mas que pode decidir o campeonato."]]},
+ {q:"Qual é o projeto do clube (seu horizonte de investimento)?", opts:[
+   ["Ganhar já","Preciso do título em 1–2 anos."],
+   ["Projeto de médio prazo","Montar um time pra brigar por tudo em 3–5 anos."],
+   ["Formar uma dinastia","Base forte pra dominar a década — 10 anos ou mais."]]},
+ {q:"Aos 80 minutos você vence por 2×0 (a carteira subiu 30%)…", opts:[
+   ["Apita, juiz!","Tiro atacante, coloco zagueiro e tranco o lucro."],
+   ["Administro o jogo","Rebalanceio: garanto parte do ganho sem parar de jogar."],
+   ["Vou pro terceiro gol","Time que está ganhando não se mexe. Deixo correr."]]},
+];
+
+const PROFILES=[
+ {min:5,max:8, name:"Retranca Raiz", formation:"5-4-1", c1:"#2f6fb5", c2:"#0e2a4a",
+  desc:"Seu jogo é não tomar gol: liquidez e previsibilidade acima de tudo. Sua carteira sai jogando curto — reserva forte, renda fixa de qualidade e paciência de líbero.",
+  alloc:[["Reserva (caixa)",15],["Renda fixa",60],["Multimercado / FIIs",20],["Ações",5]]},
+ {min:9,max:12, name:"Cérebro de Meio-Campo", formation:"4-4-2", c1:"#0a9b52", c2:"#05461f",
+  desc:"Equilíbrio de campeão: defende bem e ataca quando o jogo pede. Diversificação é o seu passe de três dedos — cada classe de ativo cumprindo sua função no setor.",
+  alloc:[["Reserva (caixa)",10],["Renda fixa",40],["Multimercado / FIIs",30],["Ações",20]]},
+ {min:13,max:15, name:"Ataque Total", formation:"3-4-3", c1:"#e2431a", c2:"#5c1505",
+  desc:"Pra você, jogo bom termina 4×3. Aceita volatilidade em troca de gol: bolsa, FIIs, internacional e uma pontinha de aposta. Só não esquece que todo time precisa de goleiro.",
+  alloc:[["Reserva (caixa)",5],["Renda fixa",20],["Multimercado / FIIs",30],["Ações e além",45]]},
+];
+
+function drawStar(x,cx,cy,r){ x.beginPath();
+  for(let i=0;i<10;i++){ const a=Math.PI/5*i-Math.PI/2, rr=i%2?r*0.45:r;
+    i?x.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr):x.moveTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr); }
+  x.closePath(); x.fill(); }
+
+/* brasão exclusivo da carteira do usuário (vai pro escudo 3D no resultado) */
+function makeCustomCrest(pr){
+  const s=1024, c=document.createElement("canvas"); c.width=c.height=s; const x=c.getContext("2d");
+  const P=(nx,ny)=>[nx*s,ny*s];
+  const path=()=>{ x.beginPath();
+    x.moveTo(...P(0.5,0.05)); x.lineTo(...P(0.93,0.17)); x.lineTo(...P(0.93,0.55));
+    x.quadraticCurveTo(...P(0.93,0.85),...P(0.5,0.97));
+    x.quadraticCurveTo(...P(0.07,0.85),...P(0.07,0.55));
+    x.lineTo(...P(0.07,0.17)); x.closePath(); };
+  const g=x.createLinearGradient(0,0,0,s); g.addColorStop(0,pr.c1); g.addColorStop(1,pr.c2);
+  path(); x.fillStyle=g; x.fill();
+  path(); x.lineWidth=s*0.016; x.strokeStyle="rgba(255,255,255,0.92)"; x.stroke();
+  const hi=x.createLinearGradient(0,0,0,s*0.5); hi.addColorStop(0,"rgba(255,255,255,0.28)"); hi.addColorStop(1,"rgba(255,255,255,0)");
+  path(); x.fillStyle=hi; x.fill();
+  x.fillStyle="#fff";
+  for(let i=-1;i<=1;i++) drawStar(x, s*0.5+i*s*0.09, s*0.115, s*0.022);
+  x.textAlign="center"; x.textBaseline="middle";
+  x.font=`800 ${s*0.13}px Segoe UI, sans-serif`;
+  x.fillText(pr.formation, s*0.5, s*0.235);
+  x.fillRect(s*0.3, s*0.302, s*0.4, s*0.006);
+  // escalação: ataque em cima, goleiro (dourado) embaixo
+  const rows=pr.formation.split("-").map(Number).reverse(); rows.push(1);
+  const ys=[0.40,0.53,0.66,0.79];
+  rows.forEach((cnt,ri)=>{
+    const y=ys[ri]*s, spread=s*0.125;
+    for(let k=0;k<cnt;k++){
+      const px=s*0.5+(k-(cnt-1)/2)*spread;
+      x.beginPath(); x.arc(px,y,s*0.026,0,Math.PI*2);
+      x.fillStyle= ri===rows.length-1 ? "#ffd75e" : "#ffffff"; x.fill();
+      x.lineWidth=s*0.006; x.strokeStyle="rgba(0,0,0,0.35)"; x.stroke();
+    }
+  });
+  x.fillStyle="rgba(255,255,255,0.9)"; x.font=`700 ${s*0.035}px Segoe UI, sans-serif`;
+  x.fillText("CARTEIRA F.C.", s*0.5, s*0.885);
+  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8;
+  const d=document.createElement("canvas"); d.width=d.height=s; const dx=d.getContext("2d");
+  dx.drawImage(c,0,0); dx.globalCompositeOperation="source-atop"; dx.fillStyle="rgba(10,12,16,0.85)"; dx.fillRect(0,0,s,s);
+  const dark=new THREE.CanvasTexture(d); dark.colorSpace=THREE.SRGBColorSpace;
+  return {tex,dark};
+}
+
+function renderQuiz(){
+  if(quiz.result){
+    const pr=quiz.result;
+    qwrap.innerHTML=`<div class="qspacer"></div>
+    <div class="qcard qresult">
+      <div class="qkick">Seu perfil de investidor</div>
+      <div class="formation">${pr.formation}</div>
+      <div class="qtitle">${pr.name}</div>
+      <div class="qsub">${pr.desc}</div>
+      <div class="alloc">${pr.alloc.map(a=>`<div class="row"><span>${a[0]}</span><div class="bar"><i style="width:${a[1]}%"></i></div><span class="pct">${a[1]}%</span></div>`).join("")}</div>
+      <div class="qsub" style="font-size:12px; opacity:.75;">*Brincadeira educativa — não é recomendação de investimento.</div>
+      <div class="qactions">
+        ${WHATSAPP?`<button class="qbtn" data-v="zap">📲 Falar com um assessor</button>`:""}
+        <button class="qbtn" data-v="copy">Copiar resultado</button>
+        <button class="qbtn" data-v="retry">↻ Refazer</button>
+      </div>
+    </div>`;
+    return;
+  }
+  if(quiz.step<0){
+    qwrap.innerHTML=`<div class="qcard">
+      <div class="qkick">Bônus interativo</div>
+      <div class="qtitle">⚽ Escale seu time e descubra que investidor você é</div>
+      <div class="qsub">5 decisões de beira de campo revelam como você joga com seu dinheiro — e qual brasão defende a sua carteira.</div>
+      <button class="qbtn" data-v="start" style="text-align:center"><b>Apita, juiz</b>Começar o jogo</button>
+    </div>`;
+    return;
+  }
+  const Q=QUESTIONS[quiz.step];
+  qwrap.innerHTML=`<div class="qcard">
+    <div class="qprog">LANCE ${quiz.step+1} / ${QUESTIONS.length}</div>
+    <div class="qtitle">${Q.q}</div>
+    ${Q.opts.map((o,ix)=>`<button class="qbtn" data-v="${ix+1}"><b>${o[0]}</b>${o[1]}</button>`).join("")}
+  </div>`;
+}
+
+function showResult(pr){
+  quiz.result=pr;
+  customSet=makeCustomCrest(pr);
+  frontTeam=0; backTeam=0; midTeam=0; // marcador: o loop aplica o brasão custom
+  rootStyle.setProperty("--c1",pr.c1); rootStyle.setProperty("--c2",pr.c2); targetColor.set(pr.c1);
+  renderQuiz();
+}
+
+qwrap.addEventListener("click",e=>{
+  const b=e.target.closest("[data-v]"); if(!b) return;
+  const v=b.dataset.v;
+  if(v==="start"){ quiz.step=0; renderQuiz(); return; }
+  if(v==="retry"){ quiz.step=-1; quiz.score=0; quiz.result=null; customSet=null;
+    rootStyle.setProperty("--c1","#4f6bff"); rootStyle.setProperty("--c2","#101430"); targetColor.set("#4f6bff");
+    renderQuiz(); return; }
+  if(v==="copy"){ const p=quiz.result;
+    navigator.clipboard.writeText(`⚽💰 Escalação do Investidor: joguei no ${p.formation} e sou "${p.name}"! Descubra o seu: ${location.href}`);
+    b.textContent="Copiado! ✔"; return; }
+  if(v==="zap"){ const p=quiz.result;
+    open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Olá! Fiz o quiz Escalação do Investidor e meu perfil é ${p.name} (${p.formation}). Quero conversar sobre a minha carteira.`)}`); return; }
+  const n=+v;
+  if(n>=1&&n<=3){
+    quiz.score+=n; quiz.step++;
+    if(quiz.step>=QUESTIONS.length){
+      const pr=PROFILES.find(P=>quiz.score>=P.min&&quiz.score<=P.max)||PROFILES[1];
+      showResult(pr);
+    }else renderQuiz();
+  }
+});
+renderQuiz();
+
 /* ---------------- TEXTURAS: escudo recortado + versão escura (miolo) ---------------- */
 function loadImg(src){return new Promise(res=>{const im=new Image(); im.crossOrigin="anonymous"; im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src;});}
 
@@ -260,10 +443,11 @@ const canvas=document.getElementById("gl");
 const boot=document.getElementById("boot");
 let renderer,scene,camera,composer,shield,frontMat,backMat,midMat,rimLightA,keyGlow,starsA,starsB,starsC,nebA,nebB,sets=[];
 let frontTeam=0, backTeam=1, midTeam=0, lastActive=-2;
+let customSet=null, shieldScale=1;
 let baseX=-1.25, baseY=-0.12;
 const mouse={x:0,y:0};
-const state={i:0,p:0.5,active:-1,heroT:0};
-let secTops=[], heroSpan=1;
+const state={i:0,p:0.5,active:-1,heroT:0,inQuiz:false};
+let secTops=[], heroSpan=1, quizTop=Infinity;
 
 async function init(){
   const imgs=await Promise.all(teams.map(t=>loadImg(t.img)));
@@ -359,8 +543,18 @@ async function init(){
   boot.classList.add("gone");
   window.__three3d={ok:true, faces:sets.length};
   // gancho de debug: executa um frame manualmente (para verificação offscreen)
-  window.__tick=()=>{ readScroll(); shield.rotation.y=targetRot(); swapByRotation(); composer.render();
-    return {i:state.i, p:+state.p.toFixed(3), active:state.active,
+  window.__tick=()=>{ readScroll();
+    if(state.inQuiz && quiz.result){
+      if(customSet){ frontMat.map=customSet.tex; backMat.map=customSet.tex; midMat.map=customSet.dark;
+        frontMat.needsUpdate=backMat.needsUpdate=midMat.needsUpdate=true; frontTeam=backTeam=midTeam=-1; }
+      shield.scale.setScalar(1); shield.position.x=0; shield.position.y=0.55;
+    }else{
+      shield.scale.setScalar(state.inQuiz?0.001:1);
+      shield.rotation.y=targetRot(); swapByRotation();
+    }
+    composer.render();
+    return {i:state.i, p:+state.p.toFixed(3), active:state.active, inQuiz:state.inQuiz,
+            result:quiz.result?quiz.result.name:null,
             front:frontTeam, back:backTeam, mid:midTeam,
             rotYdeg:+(shield.rotation.y*180/Math.PI).toFixed(1),
             c1:getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(),
@@ -372,6 +566,7 @@ async function init(){
 function measure(){
   secTops=sections.map(s=>({top:s.el.offsetTop, h:s.el.offsetHeight}));
   heroSpan=Math.max(1, secTops[0].top - innerHeight/2);
+  quizTop=quizEl.offsetTop;
 }
 function layout(){
   const mobile=innerWidth<880;
@@ -421,8 +616,22 @@ function readScroll(){
     if(!vis.has(k) && !sections[k].hidden){ sections[k].anims.forEach(a=>a.style.opacity="0"); sections[k].hidden=true; }
   }
 
+  // zona do quiz (após o último time): HUD some e a cena assume a cor do quiz/perfil
+  const inQuiz = mid >= quizTop;
+  if(inQuiz!==state.inQuiz){
+    state.inQuiz=inQuiz;
+    lastActive=-99; // força reidratação de cor/HUD ao voltar pros times
+    if(inQuiz){
+      counter.classList.remove("show");
+      const pr=quiz.result;
+      rootStyle.setProperty("--c1",pr?pr.c1:"#4f6bff");
+      rootStyle.setProperty("--c2",pr?pr.c2:"#101430");
+      targetColor.set(pr?pr.c1:"#4f6bff");
+    }
+  }
+
   // cor/HUD seguem a seção ativa (troca exatamente com o escudo de perfil)
-  if(active!==lastActive){
+  if(!state.inQuiz && active!==lastActive){
     const t=teams[state.i];
     rootStyle.setProperty("--c1",t.c1); rootStyle.setProperty("--c2",t.c2);
     if(active<0) counter.classList.remove("show");
@@ -457,13 +666,30 @@ function animate(){
   const dt=Math.min(clock.getDelta(),0.05), t=clock.elapsedTime;
   readScroll();
 
-  shield.rotation.y += (targetRot() - shield.rotation.y)*Math.min(1,dt*7);
-  swapByRotation();
+  // escudo desaparece durante as perguntas do quiz e volta como troféu no resultado
+  const sT=(state.inQuiz && !quiz.result)?0:1;
+  shieldScale += (sT-shieldScale)*Math.min(1,dt*5);
+  shield.scale.setScalar(Math.max(0.001,shieldScale));
+
+  if(state.inQuiz && quiz.result){
+    if(frontTeam!==-1 && customSet){
+      frontMat.map=customSet.tex; backMat.map=customSet.tex; midMat.map=customSet.dark;
+      frontMat.needsUpdate=backMat.needsUpdate=midMat.needsUpdate=true;
+      frontTeam=backTeam=midTeam=-1;
+    }
+    shield.position.x += (0-shield.position.x)*Math.min(1,dt*4);   // centraliza
+    shield.position.y = 0.55 + Math.sin(t*1.1)*0.05;
+    shield.rotation.y += dt*0.7;                                    // vitrine girando
+  }else{
+    shield.position.x += (baseX-shield.position.x)*Math.min(1,dt*6);
+    shield.rotation.y += (targetRot() - shield.rotation.y)*Math.min(1,dt*7);
+    swapByRotation();
+    shield.position.y = baseY + Math.sin(t*1.1)*0.05;
+  }
 
   // vida: leve balanço + parallax do mouse
   shield.rotation.x += ((0.05 + mouse.y*0.1) - shield.rotation.x)*Math.min(1,dt*4);
   shield.rotation.z = Math.sin(t*0.6)*0.02;
-  shield.position.y = baseY + Math.sin(t*1.1)*0.05;
 
   activeColor.lerp(targetColor, Math.min(1,dt*3));
   rimLightA.color.copy(activeColor);
